@@ -1,0 +1,141 @@
+# ========================
+# CORRELATION ANALYSIS
+# ========================
+# This Analysis Will Only Work After Running The Predictive Modelling Script
+
+# Load Required Packages
+library(dplyr)
+library(corrplot)
+library(ggplot2)
+
+# 1. Select relevant columns from the dataset
+cor_data <- data_all %>%
+  select(presence, elevation, rainfall, soil_moisture, tmax, tmin)
+
+# 2. Compute Pearson correlation matrix
+cor_matrix <- cor(cor_data, use = "complete.obs", method = "pearson")
+
+# 3. Visualize correlation matrix
+corrplot(cor_matrix, method = "color",
+         addCoef.col = "black",  # add numeric values to cells
+         number.cex = 0.8,
+         tl.cex = 0.9,
+         title = "Pearson Correlation: Fault Presence vs Environmental Variables",
+         mar = c(0, 0, 2, 0))
+
+# 4. Extract and print correlations with fault presence
+cor_with_fault <- cor_matrix["presence", -1, drop = FALSE]
+print(round(cor_with_fault, 3))
+
+# 5. Add scatter plots for assessing relationship between env. variables and fault presence
+# Load required libraries
+library(ggplot2)
+library(tidyr)
+
+# Create a long-format version of the data for plotting
+scatter_data <- data_all %>%
+  select(presence, elevation, rainfall, soil_moisture, tmax, tmin) %>%
+  pivot_longer(cols = -presence, names_to = "Variable", values_to = "Value")
+
+# Plot scatterplots using ggplot2
+ggplot(scatter_data, aes(x = Value, y = presence)) +
+  # Use smaller, more transparent points with jitter
+  geom_jitter(width = 0.2, height = 0.03, alpha = 0.3, color = "#1f77b4", size = 1.5) +
+  
+  # Add a linear trend line with confidence interval
+  geom_smooth(method = "lm", color = "#d62728", se = TRUE, size = 1) +
+  
+  # Use facets for each variable, set free x-scale and more readable layout
+  facet_wrap(~Variable, scales = "free_x", ncol = 3) +
+  
+  # Refine axis and titles
+  labs(
+    title = "Scatterplots: Environmental Variables vs Fault Presence",
+    x = "Environmental Variable Value",
+    y = "Fault Presence (0 = No, 1 = Yes)"
+  ) +
+  
+  # Clean theme and tweak spacing
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    strip.text = element_text(face = "bold", size = 13),
+    axis.title = element_text(face = "bold"),
+    panel.spacing = unit(1.5, "lines")
+  )
+
+# PAIRWISE CORRELATION & DISTRIBUTION OF FAULTS VS VARIABLES #
+# NB: All Data Where Reprojected To A Default CRS For Visualization In the Shiny App of R Unlike In the Predictive Modelling #
+# ---------------- Load Required Libraries ----------------
+library(sf)
+library(terra)
+library(dplyr)
+library(pROC)
+library(shiny)
+library(shinythemes)
+library(leaflet)
+library(RColorBrewer)
+library(mapview)
+library(webshot)
+library(webshot2)
+library(GGally)
+
+# ---------------- Load Data ----------------
+load_data <- function() {
+  list(
+    faults = st_read("D:/DATA & OUTPUTS/TTCL PROJECT/SHAPEFILE/Faults_DodomaUrban.shp") %>% st_transform(3857),
+    dodoma_urban = st_read("D:/DATA & OUTPUTS/TTCL PROJECT/SHAPEFILE/Dodoma_urban_reprojected.shp") %>% st_transform(3857),
+    elevation = rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/ELEVATION/Dodoma_Elevation_Data.tif") %>% project("EPSG:3857"),
+    rainfall = rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/Rainfall_2020-2024.nc")[[1]] %>% project("EPSG:3857"),
+    soil_moisture = rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/SoilMoisture_2020_2024.nc")[[1]] %>% project("EPSG:3857"),
+    tmax = rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/Maximum Temperature_2020_2024.nc")[[1]] %>% project("EPSG:3857"),
+    tmin = rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/Minimum Temperature_2020-2024.nc")[[1]] %>% project("EPSG:3857"),
+    buildings = st_read("D:/DATA & OUTPUTS/TTCL PROJECT/INFRASTRUCTURAL DATA/filtered_osm_dodoma/buildings_dodoma.shp") %>% st_transform(3857),
+    fiber = st_read("D:/DATA & OUTPUTS/TTCL PROJECT/INFRASTRUCTURAL DATA/Geojson Files/fibers.geojson") %>% st_transform(3857)
+  )
+}
+
+# ---------------- Build Model ----------------
+build_model <- function(data) {
+  data$faults$elevation <- terra::extract(data$elevation, vect(data$faults))[,2]
+  data$faults$rainfall <- terra::extract(data$rainfall, vect(data$faults))[,2]
+  data$faults$soil_moisture <- terra::extract(data$soil_moisture, vect(data$faults))[,2]
+  data$faults$tmax <- terra::extract(data$tmax, vect(data$faults))[,2]
+  data$faults$tmin <- terra::extract(data$tmin, vect(data$faults))[,2]
+  data$faults$building_density <- lengths(st_intersects(st_buffer(data$faults, 50), data$buildings))
+  data$faults$fault_present <- 1
+  
+  set.seed(123)
+  bg_points <- st_sample(data$dodoma_urban, 500, type = "random") %>% st_as_sf()
+  bg_points <- st_transform(bg_points, 3857)
+  bg_points$elevation <- terra::extract(data$elevation, vect(bg_points))[,2]
+  bg_points$rainfall <- terra::extract(data$rainfall, vect(bg_points))[,2]
+  bg_points$soil_moisture <- terra::extract(data$soil_moisture, vect(bg_points))[,2]
+  bg_points$tmax <- terra::extract(data$tmax, vect(bg_points))[,2]
+  bg_points$tmin <- terra::extract(data$tmin, vect(bg_points))[,2]
+  bg_points$building_density <- lengths(st_intersects(st_buffer(bg_points, 50), data$buildings))
+  bg_points$fault_present <- 0
+  
+  combined_data <- bind_rows(st_drop_geometry(data$faults), st_drop_geometry(bg_points))
+  
+  model <- glm(fault_present ~ elevation + rainfall + soil_moisture + tmax + tmin + building_density,
+               data = combined_data, family = binomial())
+  predicted_probs <- predict(model, type = "response")
+  roc_obj <- roc(combined_data$fault_present, predicted_probs)
+  
+  list(model = model, roc = roc_obj, combined_data = combined_data)
+}
+
+# --------------- Load model data ----------------
+model_data <- build_model(load_data())
+
+# ---------------- Select variables for a broader pairwise analysis ----------------
+correlation_data <- model_data$combined_data %>%
+  select(elevation, rainfall, soil_moisture, tmax, tmin, fault_present) %>%
+  mutate(fault_present = as.factor(fault_present))  # ensure it's a factor
+
+# --------------- Visualize pairwise relationships with color indicating fault presence ----------------
+ggpairs(correlation_data, aes(color = fault_present),
+        title = "Pairwise Correlation & Distribution: Faults vs Variables")
+
+# END OF CORRELATION ANALYSIS SCRIPT #

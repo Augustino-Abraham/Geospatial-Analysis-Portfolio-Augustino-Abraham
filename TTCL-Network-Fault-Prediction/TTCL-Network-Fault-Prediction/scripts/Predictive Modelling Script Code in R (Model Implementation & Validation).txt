@@ -1,0 +1,150 @@
+## ----------------------------------------------
+## PREDICTIVE MODEL SCRIPT
+## ----------------------------------------------
+
+# === Load Required Libraries ===
+library(sf)
+library(terra)
+library(dplyr)
+library(tmap)
+library(pROC)
+library(ggplot2)
+library(tidyr)
+
+# === Load Spatial Data ===
+faults <- st_read("D:/DATA & OUTPUTS/TTCL PROJECT/SHAPEFILE/Faults_DodomaUrban.shp")
+dodoma_urban <- st_read("D:/DATA & OUTPUTS/TTCL PROJECT/SHAPEFILE/Dodoma_urban_reprojected.shp")
+buildings <- st_read("D:/DATA & OUTPUTS/TTCL PROJECT/INFRASTRUCTURAL DATA/filtered_osm_dodoma/buildings_dodoma.shp")
+fiber <- st_read("D:/DATA & OUTPUTS/TTCL PROJECT/INFRASTRUCTURAL DATA/Geojson Files/fibers.geojson")
+
+# === Load Environmental Rasters ===
+elevation <- rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/ELEVATION/Dodoma_Elevation_Data.tif")
+rainfall <- rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/Rainfall_2020-2024.nc")
+soil_moisture <- rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/SoilMoisture_2020_2024.nc")
+tmax <- rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/Maximum Temperature_2020_2024.nc")
+tmin <- rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/WEATHER PATTERNS/NEW DATA/Minimum Temperature_2020-2024.nc")
+
+# === Reproject All Layers to Common CRS ===
+target_crs <- st_crs(dodoma_urban)
+faults <- st_transform(faults, target_crs)
+buildings <- st_transform(buildings, target_crs)
+fiber <- st_transform(fiber, target_crs)
+
+# Reproject rasters
+elevation <- project(elevation, target_crs$wkt)
+rainfall <- project(mean(rainfall), target_crs$wkt)
+soil_moisture <- project(mean(soil_moisture), target_crs$wkt)
+tmax <- project(mean(tmax), target_crs$wkt)
+tmin <- project(mean(tmin), target_crs$wkt)
+
+# === Resample All Layers to Common Grid ===
+ref_raster <- elevation
+rainfall <- resample(rainfall, ref_raster)
+soil_moisture <- resample(soil_moisture, ref_raster)
+tmax <- resample(tmax, ref_raster)
+tmin <- resample(tmin, ref_raster)
+
+# === Build Environmental Stack ===
+env_stack <- c(elevation, rainfall, soil_moisture, tmax, tmin)
+names(env_stack) <- c("elevation", "rainfall", "soil_moisture", "tmax", "tmin")
+env_stack <- crop(env_stack, vect(dodoma_urban)) %>% mask(vect(dodoma_urban))
+
+# === Sample Background Points ===
+set.seed(123)
+n_bg <- nrow(faults) * 3
+bg_points <- spatSample(env_stack, n_bg, method = "random", as.points = TRUE, na.rm = TRUE)
+bg_sf <- st_as_sf(bg_points)
+bg_sf$presence <- 0
+
+# === Tag Fault Points ===
+faults <- faults[dodoma_urban, ]
+faults$presence <- 1
+
+# === Extract Raster Values to Training Data ===
+faults_vect <- vect(faults)
+bg_vect <- vect(bg_sf)
+
+fault_vals <- terra::extract(env_stack, faults_vect) %>% select(-ID) %>% mutate(presence = 1)
+bg_vals <- terra::extract(env_stack, bg_vect) %>% select(-ID) %>% mutate(presence = 0)
+
+data_all <- bind_rows(fault_vals, bg_vals) %>% drop_na()
+
+# === Train GLM Model ===
+glm_model <- glm(presence ~ elevation + rainfall + soil_moisture + tmax + tmin,
+                 data = data_all, family = binomial)
+summary(glm_model)
+
+# === Evaluate Model with ROC ===
+data_all$predicted <- predict(glm_model, type = "response")
+roc_obj <- roc(data_all$presence, data_all$predicted)
+auc_val <- auc(roc_obj)
+plot(roc_obj, col = "blue", main = "ROC Curve")
+
+# Enhanced ROC Curve Visualization with AUC Annotation
+# Create data frame from roc object
+roc_df <- data.frame(
+  fpr = rev(roc_obj$specificities),
+  tpr = rev(roc_obj$sensitivities)
+)
+
+# Extract AUC
+auc_val <- auc(roc_obj)
+
+# Enhanced ROC plot with perfect classifier point
+ggplot(roc_df, aes(x = 1 - fpr, y = tpr)) +
+  geom_line(color = "blue", size = 1.2) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "brown") +
+  geom_point(data = roc_df[which.max(roc_df$tpr + (1 - roc_df$fpr)), ],
+             aes(x = 1 - fpr, y = tpr), color = "darkblue", size = 3) +
+  # Add perfect classifier dot
+  geom_point(aes(x = 0, y = 1), color = "blue", size = 4) +
+  annotate("text", x = 0.02, y = 0.97, label = "PERFECT CLASSIFIER", hjust = 0, color = "blue", size = 5) +
+  # AUC label and interpretive zones
+  annotate("text", x = 0.6, y = 0.2, label = paste("AUC =", round(auc_val, 3)), size = 6, color = "darkgreen") +
+  annotate("text", x = 0.2, y = 0.85, label = "BETTER", size = 6, color = "black") +
+  annotate("text", x = 0.8, y = 0.2, label = "WORSE", size = 6, color = "black") +
+  labs(title = "ROC Curve",
+       x = "False Positive Rate",
+       y = "True Positive Rate") +
+  theme_minimal(base_size = 14)
+
+ggsave("D:/DATA & OUTPUTS/TTCL PROJECT/OUTPUTS/ROC_curve_AUC_with_perfect_classifier.png", width = 8, height = 6)
+
+# === Predict on Full Raster ===
+risk_map <- predict(env_stack, glm_model, type = "response")
+risk_map <- mask(risk_map, vect(dodoma_urban))
+
+# === Export Risk Map ===
+writeRaster(risk_map, "D:/DATA & OUTPUTS/TTCL PROJECT/OUTPUTS/TTCL_fault_risk_map.tif", overwrite = TRUE)
+
+# ---------------------------------------------
+# Extract Fault Points from Top 5% Hotspots ===
+# ---------------------------------------------
+
+# Step 1: Convert raster values to dataframe
+risk_df <- as.data.frame(risk_map, xy = TRUE, na.rm = TRUE)
+colnames(risk_df) <- c("x", "y", "risk")
+
+# Step 2: Get cutoff for top 5%
+top5_cutoff <- quantile(risk_df$risk, probs = 0.95, na.rm = TRUE)
+top_risk_df <- risk_df %>% filter(risk >= top5_cutoff)
+
+# Step 3: Randomly sample 100 points from top risk zones
+set.seed(999)
+sampled_points_df <- top_risk_df %>% sample_n(size = 100)
+
+# Step 4: Convert to spatial features
+predicted_faults_hotspots <- st_as_sf(sampled_points_df, coords = c("x", "y"), crs = st_crs(dodoma_urban))
+
+# Step 5: Visualize Results
+tm_shape(risk_map) +
+  tm_raster(style = "cont", palette = "-RdYlBu", title = "Fault Risk") +
+  tm_shape(predicted_faults_hotspots) +
+  tm_dots(col = "black", size = 0.05, title = "Predicted Faults (Top 5%)") +
+  tm_shape(dodoma_urban) + tm_borders(col = "black") +
+  tm_layout(main.title = "TTCL Fault Hotspot Prediction", legend.outside = TRUE)
+
+# Step 6: Save Output Shapefile
+st_write(predicted_faults_hotspots,
+         "D:/DATA & OUTPUTS/TTCL PROJECT/OUTPUTS/predicted_faults_top5_percent.shp",
+         delete_dsn = TRUE)

@@ -1,0 +1,127 @@
+# ========================
+# TERRAIN ANALYSIS
+# ========================
+# Load Required Packages 
+library(terra)
+library(sf)
+library(tmap)
+library(dplyr)
+library(ggplot2)  # plotting histogram
+
+# 1. Load data
+elevation <- rast("D:/DATA & OUTPUTS/TTCL PROJECT/ENVIRONMENTAL DATA/ELEVATION/Dodoma_Elevation_Data.tif")
+faults     <- st_read("D:/DATA & OUTPUTS/TTCL PROJECT/SHAPEFILE/Faults_DodomaUrban.shp")
+
+# 2. Compute slope in degrees
+slope <- terra::terrain(elevation, v = "slope", unit = "degrees", neighbors = 8)
+
+# 3. Reclassify slope into 4 categories
+m <- matrix(c(
+  0,  10, 1,
+  10, 20, 2,
+  20, 35, 3,
+  35, Inf,4
+), ncol = 3, byrow = TRUE)
+slope_class <- classify(slope, m)
+
+# 4. Label classes
+slope_lvls <- c(
+  "0–10° (Flat–Gentle)",
+  "10–20° (Moderate)",
+  "20–35° (Steep)",
+  "35°+ (Very Steep)"
+)
+
+# 5. Extract slope at each fault point
+# (terra::extract returns a data.frame with a column named "slope")
+faults$slope <- terra::extract(slope, vect(faults))$slope
+
+# 6. Build tmap
+tmap_mode("plot")
+slope_map <- 
+  tm_shape(slope_class) +
+  tm_raster(
+    palette    = "YlOrBr",
+    labels     = slope_lvls,
+    title      = "Slope Category"
+  ) +
+  tm_shape(faults) +
+  tm_symbols(
+    size       = 0.4,
+    col        = "slope",
+    palette    = "Reds",
+    title.col  = "Slope (°)"
+  ) +
+  tm_graticules(lines = FALSE, ticks = TRUE, col = "grey30") +
+  tm_layout(
+    title            = "Slope Classification at Fault Locations",
+    title.position   = c("center","top"),
+    legend.outside   = TRUE,
+    legend.text.size = 1.2,
+    legend.title.size= 1.4,
+    frame            = TRUE
+  )
+
+# 7. Print & save the map
+print(slope_map)
+tmap_save(
+  tm       = slope_map,
+  filename = "D:/DATA & OUTPUTS/TTCL PROJECT/OUTPUTS/slope_fault_classified.png",
+  width    = 10, height = 7, units = "in", dpi = 300
+)
+
+# BOXPLOT COMPARISON & HISTOGRAM OF SLOPE AT FAULT LOCATIONS #
+# This Part Will Only Work After Running The Predictive Model Script First #
+# --------- Extract Background Slopes (Optional for Comparison) ---------
+bg_slope_vals <- terra::extract(slope, vect(bg_sf))
+bg_slope_vals$presence <- 0
+fault_slope_vals <- terra::extract(slope, vect(faults))
+fault_slope_vals$presence <- 1
+slope_data <- bind_rows(fault_slope_vals, bg_slope_vals)
+
+# -------- Histogram of slope at fault locations ---------
+hist_plot <- ggplot(faults, aes(x = slope)) +
+  geom_histogram(
+    binwidth    = 1,
+    boundary    = 0,
+    closed      = "left",
+    fill        = "steelblue",
+    color       = "white"
+  ) +
+  scale_x_continuous(breaks = seq(0, 12, by = 1), limits = c(0, 12)) +
+  labs(
+    title = ,
+    x     = "Slope (°)",
+    y     = "Frequency"
+  ) +
+  theme_minimal(base_size = 14)
+
+# --------- Print & save histogram -----------
+print(hist_plot)
+ggsave(
+  filename = "D:/DATA & OUTPUTS/TTCL PROJECT/OUTPUTS/slope_fault_histogram.png",
+  plot     = hist_plot,
+  width    = 8, height = 6, units = "in", dpi = 300
+)
+
+
+# --------- Boxplot Comparison with Enhanced Fonts ---------
+par(
+  font.main = 2,         # Bold title
+  font.lab = 2,          # Bold axis labels
+  font.axis = 2,         # Bold axis ticks
+  cex.main = 1.4,        # Title size
+  cex.lab = 1.3,         # Axis label size
+  cex.axis = 1.2         # Axis tick size
+)
+
+boxplot(slope ~ presence, data = slope_data,
+        names = c("Non-Fault", "Fault"),
+        main = "Slope Comparison at Fault vs Non-Fault Areas",
+        ylab = "Slope (degrees)",
+        col = c("lightblue", "tomato"))
+
+# Reset plotting parameters if needed (optional)
+par(font.main = 1, font.lab = 1, font.axis = 1, cex.main = 1, cex.lab = 1, cex.axis = 1)
+
+# --------- END OF TERRAIN ANALYSIS SCRIPT --------- #

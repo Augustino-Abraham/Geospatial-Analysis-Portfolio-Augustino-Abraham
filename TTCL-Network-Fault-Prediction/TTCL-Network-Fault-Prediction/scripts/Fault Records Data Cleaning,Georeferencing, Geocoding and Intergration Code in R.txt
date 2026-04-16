@@ -1,0 +1,48 @@
+# Load required libraries
+library(readxl)
+library(dplyr)
+library(stringr)
+library(tidygeocoder)
+library(sf)
+
+# Step 1: Load Excel file
+file_path <- "D:/DATA & OUTPUTS/GIS DATA OUTPUTS/TTCL PROJECT/FAULT & CUSTOMER DATA/Fault report july-december 2023.xlsx"
+df <- read_excel(file_path)
+
+# Step 2: Rename columns for convenience
+df_clean <- df %>%
+  rename(
+    region = REGION_NAME,
+    address = `Customer Address`
+  )
+
+# Step 3: Clean addresses and tag PO Boxes
+df_clean <- df_clean %>%
+  mutate(
+    address = str_to_title(address),
+    address = str_trim(address),
+    is_po_box = str_detect(address, regex("P\\.?O\\.?|PO BOX|BOX", ignore_case = TRUE)),
+    full_address = paste(address, region, "Tanzania", sep = ", ")
+  )
+
+# Step 4: Geocode
+geocoded <- df_clean %>%
+  geocode(address = full_address, method = 'osm', lat = latitude, long = longitude, limit = 1)
+
+# Step 5: Convert to spatial object in WGS 84
+geocoded_sf <- geocoded %>%
+  filter(!is.na(latitude) & !is.na(longitude)) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+# ✅ Step 6: Transform to UTM Zone 36S (EPSG:32736)
+geocoded_sf_utm <- st_transform(geocoded_sf, crs = 32736)
+
+# Step 7: Save results
+write.csv(geocoded, "D:/DATA & OUTPUTS/GIS DATA OUTPUTS/TTCL PROJECT/FAULT & CUSTOMER DATA/fault_customers_geocoded_july-december_2023.csv", row.names = FALSE)
+
+# Save as GeoPackage
+st_write(
+  geocoded_sf_utm,
+  "D:/DATA & OUTPUTS/GIS DATA OUTPUTS/TTCL PROJECT/FAULT & CUSTOMER DATA/fault_customers_geocoded_july-december_2023.gpkg",
+  delete_dsn = TRUE
+)
