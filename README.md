@@ -1,46 +1,112 @@
-# 🌍 GIS & Remote Sensing Portfolio
+# 🌍 Geospatial Analysis Portfolio
 
-Welcome to my GIS & Remote Sensing portfolio showcasing applied geospatial analysis for environmental and urban planning applications.
-
----
-
-## 👤 About Me
-I specialize in GIS, Remote Sensing, and spatial analysis with a focus on transforming geospatial data into actionable insights for decision-making in environmental management, urban planning, and conservation.
+### 📡 GIS & Remote Sensing Projects | Augustino Abraham
 
 ---
 
-## 📁 Featured Projects
+## 👨‍💻 About Me
 
-### 🔥 Burn Severity Analysis
-- Environmental remote sensing study analyzing fire-affected areas
-- Raster classification and spatial interpretation  
-📌 Folder: `Burn_Severity_Analysis`
+I am a GIS & Remote Sensing Analyst specializing in **spatial analysis, predictive modeling, and environmental monitoring**.
 
----
-
-### 🏙️ Public Facilities Hotspot Analysis (Dodoma Urban)
-- Kernel Density Estimation (KDE) for spatial clustering
-- Urban accessibility and service distribution analysis  
-📌 Folder: `Public_Facilities_Hotspot`
+I use tools like **QGIS, R, and remote sensing data** to solve real-world problems in infrastructure, urban planning, and environmental analysis.
 
 ---
 
-## 🛠️ Core Skills
-- Spatial analysis & modelling  
-- Remote sensing classification  
-- Geographic mapping & visualization  
-- Data analysis & interpretation  
-- Project workflow design  
-
-Tools:
-:contentReference[oaicite:0]{index=0}, ArcGIS Pro, Google Earth Engine, ERDAS Imagine, RStudio
+# 🚀 Featured Projects
 
 ---
 
-## 📬 Contact
-- LinkedIn: www.linkedin.com/in/augustino-abraham-3825673a5  
-- Email: augustinoabr@gmail.com
+## 📡 1. TTCL Network Fault Prediction (Dodoma, Tanzania)
+
+A GIS-based predictive model developed to identify **high-risk areas for fiber-optic network faults**, supporting proactive maintenance.
+
+### 🔍 Key Highlights
+
+* Integration of **environmental + spatial datasets**
+* Predictive modeling using **GLM (Logistic Regression)**
+* Excellent model performance (**AUC = 0.979**)
+* GIS-based **Fault Risk Mapping**
+
+### 🗺️ Preview
+
+![Fault Risk Map](TTCL-Network-Fault-Prediction/outputs/maps/fault_risk_map.png)
+
+```id="1c6v08"
+![Fault Risk Map](TTCL-Network-Fault-Prediction/outputs/maps/fault_risk_map.png)
+```
+
+📂 Folder: `TTCL-Network-Fault-Prediction`
 
 ---
 
-⭐ This portfolio is continuously improved with new geospatial projects.
+## 🔥 2. Burn Severity Analysis
+
+A remote sensing project analyzing **fire-affected areas** using satellite imagery.
+
+### 🔍 Key Highlights
+
+* Raster classification techniques
+* Burn severity mapping
+* Environmental impact assessment
+
+🗺️ Preview
+
+![Burn Severity Map](Burn_Severity_Analysis/burn_severity_map.png)
+
+📂 Folder: `Burn_Severity_Analysis`
+
+---
+
+## 🏙️ 3. Public Facilities Hotspot Analysis (Dodoma Urban)
+
+A spatial analysis project identifying clusters of public facilities using **Kernel Density Estimation (KDE)**.
+
+### 🔍 Key Highlights
+
+* Spatial clustering using KDE
+* Urban accessibility analysis
+* Service distribution mapping
+
+🗺️ Preview
+
+![Hotspot Map](Public_Facilities_Hotspot_Dodoma/hotspot_map.png)
+
+📂 Folder: `Public_Facilities_Hotspot_Dodoma`
+
+---
+
+# 🛠️ Tools & Technologies
+
+* QGIS
+* R Studio (GLM, ROC, Statistical Analysis)
+* ArcGIS
+* Remote Sensing Data (SRTM, Satellite Imagery)
+
+---
+
+# 📊 What This Portfolio Demonstrates
+
+* Spatial data analysis and visualization
+* Predictive modeling in GIS
+* Remote sensing applications
+* Decision-support system development
+
+---
+
+# 🌐 Connect With Me
+
+* LinkedIn: *(Add your link here)*
+* GitHub: https://github.com/Augustino-Abraham
+
+---
+
+# 💡 Portfolio Purpose
+
+This portfolio showcases my ability to:
+
+* Analyze spatial and environmental data
+* Build GIS-based predictive models
+* Develop practical solutions for real-world problems
+* Communicate insights through maps and visualizations
+
+---
