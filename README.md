@@ -31,10 +31,6 @@ A GIS-based predictive model developed to identify **high-risk areas for fiber-o
 
 ![Fault Risk Map](TTCL-Network-Fault-Prediction/outputs/maps/fault_risk_map.png)
 
-```id="1c6v08"
-![Fault Risk Map](TTCL-Network-Fault-Prediction/outputs/maps/fault_risk_map.png)
-```
-
 📂 Folder: `TTCL-Network-Fault-Prediction`
 
 ---
@@ -69,7 +65,7 @@ A spatial analysis project identifying clusters of public facilities using **Ker
 
 🗺️ Preview
 
-![Hotspot Map](Public_Facilities_Hotspot_Dodoma/hotspot_map.png)
+![Hotspot Map](Public_Facilities_Hotspot_Dodoma/Public Facilities Hotspot Map of Dodoma Urban.pdf)
 
 📂 Folder: `Public_Facilities_Hotspot_Dodoma`
 
