@@ -92,7 +92,7 @@ A spatial analysis project identifying clusters of public facilities using **Ker
 # 🌐 Connect With Me
 
 * LinkedIn: www.linkedin.com/in/augustino-abraham-3825673a5
-* GitHub: https://github.com/Augustino-Abraham
+* GitHub: https://github.com/Augustino-Abraham/Geospatial-Analysis-Portfolio-Augustino-Abraham
 
 ---
 
